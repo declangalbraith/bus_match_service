@@ -1,0 +1,3 @@
+json5
+mysql-connector-python
+pandas

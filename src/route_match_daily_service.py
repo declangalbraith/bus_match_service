@@ -2,9 +2,11 @@
 # 日 期： 2023/11/30
 import configparser
 import json
+import requests
 import mysql.connector
 import pandas as pd
 from math import radians, cos, sin, asin, sqrt
+from datetime import datetime
 
 #匹配率阈值，大于等于该阈值时，认为是找到匹配路线
 MATCH_RATE_THRESHOLD = 0.95
@@ -141,15 +143,97 @@ def find_best_route(route_match_rates, route_coverage):
     top_route = max(top_matched_routes, key=lambda route: route_coverage[route])
     return top_route
 
+def get_authorization():
+    """获取SDK接口调用的鉴权"""
+    params = {
+        "username": config['SDK']['USERNAME'],
+        "password": config['SDK']['PASSWORD']
+    }
+    response = requests.post(config['SDK']['LOGIN_URL'], data=params,verify=False)
+    if response.status_code != 200:
+        raise Exception("获取Authorization失败")
+    data = json.loads(response.text)["data"]
+    return data["token_type"] + " " + data["access_token"]
+
+def get_get_response_body_json(param_map, url, authorization):
+    """
+    调用SDK接口获取数据
+    :param param_map: 用户名、密码
+    :param url: url
+    :param authorization: token
+    :return: 获取数据
+    """
+    real_url = url
+    if param_map:
+        real_url += "?"
+        for key, value in param_map.items():
+            real_url += f"{key}={value}&"
+        real_url = real_url[:-1]  # Remove the last "&" character
+    headers = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "Authorization": authorization
+    }
+    try:
+        response = requests.get(real_url, headers=headers,verify=False)
+        if response.status_code != 200:
+            print(f"调用接口：{real_url} 失败")
+            return None
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"调用接口：{real_url} 失败: {str(e)}")
+        return None
+
+def getData(vin,start_time,end_time):
+    """
+    获取指定时间段的历史
+    :param vin:
+    :param start_time:
+    :param end_time:
+    :return:
+    """
+    timestamp_start = int(start_time.timestamp() * 1000)
+    timestamp_end = int(end_time.timestamp() * 1000)
+    params = {
+        "vin": vin,
+        "timeStar": timestamp_start,
+        "timeEnd": timestamp_end
+    }
+
+    url = "https://iov.yaxingbus.com/asia-monitor/mavehiclerealtime/getGbHistoryNew"
+
+    # 调用获取国标历史数据的方法
+    data = get_get_response_body_json(params, url, author)
+    # 提取指定字段的数据行
+    rows = []
+    for item in data["data"]["gbDataList"]:
+        row = [item["MDT_PO_LON"], item["MDT_PO_LAT"]]
+        rows.append(row)
+
+    # 将两个列表转换为DataFrame
+    df1 = pd.DataFrame(rows, columns=["经度", "纬度"])
+
+    return df1
+
 if __name__ == '__main__':
     #第1步、读取数据库，获取所有路线信息
     route_data = get_route_data()
     #第2步、数据预处理，解析各站点关联路线、每条路线站点总数、每条路线路径长度
     stations_dict, total_stations_per_route, route_coverage = process_route_data(route_data)
 
-    #第31步、获取待匹配轨迹数据
-    excel_path = config['filepath']['excel_path']
-    df = pd.read_excel(excel_path, engine='openpyxl')
+    #第3步、获取待匹配轨迹数据
+    # excel_path = config['filepath']['excel_path']
+    # df = pd.read_excel(excel_path, engine='openpyxl')
+
+    author = get_authorization()
+    start_time = '2023-11-28 00:00:00'
+    end_time = '2023-11-28 23:59:59'
+    start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+    end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+    df = getData("LJSKB6KT6MD001706", start_time, end_time)
+
+    for column in df.columns:
+        df[column] = pd.to_numeric(df[column], errors='coerce')
+    df = df.dropna()
 
     #判断轨迹数据是否存在
     if len(df)!=0:
