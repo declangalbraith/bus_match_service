@@ -6,6 +6,7 @@ from data_fetcher import DataFetcher
 from route_matcher import RouteMatcher
 from task_manager import TaskManager
 from datetime import datetime
+from database_manager import DatabaseManager
 import os
 import pandas as pd
 
@@ -39,8 +40,10 @@ if __name__ == '__main__':
     route_matcher = RouteMatcher(db_config)
     task_manager = TaskManager(data_fetcher, route_matcher)
 
-    vehicle_ids = get_vehicle_ids(config['filepath']['excel_path'])
-    start_time = datetime.strptime('2023-12-04 00:00:00', "%Y-%m-%d %H:%M:%S")
-    end_time = datetime.strptime('2023-12-04 23:59:59', "%Y-%m-%d %H:%M:%S")
+    db_manager = DatabaseManager(db_config)
 
-    task_manager.manage_tasks(vehicle_ids, start_time, end_time)
+    vehicle_ids = get_vehicle_ids(config['filepath']['excel_path'])
+    start_time = datetime.strptime('2023-12-12 00:00:00', "%Y-%m-%d %H:%M:%S")
+    end_time = datetime.strptime('2023-12-12 23:59:59', "%Y-%m-%d %H:%M:%S")
+
+    task_manager.manage_tasks(vehicle_ids, start_time, end_time,db_manager)

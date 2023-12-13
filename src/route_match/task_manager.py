@@ -3,9 +3,7 @@
 
 import threading
 import queue
-
-import threading
-import queue
+from datetime import datetime, timedelta
 
 #匹配率阈值，大于等于该阈值时，认为是找到匹配路线
 MATCH_RATE_THRESHOLD = 0.95
@@ -30,10 +28,9 @@ class TaskManager:
                 print(f"{vin}没有完全匹配的路线")
                 print(
                     f"{vin}最近似路线：{matched_route}, 匹配率：{route_match_rates[matched_route]:.2%}, 路径覆盖度：{route_coverage[matched_route]:.2f}km")
+            result_queue.put((vin, matched_route,route_match_rates[matched_route],route_coverage[matched_route]))
         else:
             print(f"{vin}未找到匹配的路线")
-
-        result_queue.put((vin, matched_route))
 
     def worker(self, task_queue, result_queue):
         while True:
@@ -50,7 +47,7 @@ class TaskManager:
                 print(f"在处理 {vin} 时发生错误: {e}")
                 task_queue.task_done()
 
-    def manage_tasks(self, vehicle_ids, start_time, end_time):
+    def manage_tasks(self, vehicle_ids, start_time, end_time,db_manager):
         """
         管理和分配任务到线程。
         """
@@ -59,7 +56,7 @@ class TaskManager:
         threads = []
 
         # 创建工作线程
-        for _ in range(5):  # 线程数量可以调整
+        for _ in range(5):  # 线程数量
             thread = threading.Thread(target=self.worker, args=(task_queue, result_queue))
             thread.start()
             threads.append(thread)
@@ -69,16 +66,30 @@ class TaskManager:
             task_queue.put((vin, start_time, end_time))
 
         # 停止信号
-        for _ in threads:
+        for _ in range(len(threads)):
             task_queue.put(None)
+
+        task_queue.join()
 
         # 等待所有任务完成
         for thread in threads:
             thread.join()
 
+        # 计算前一天的日期
+        # previous_day = datetime.now().date() - timedelta(days=1)
+        save_day = start_time.date()
+
         # 处理结果
         results = []
         while not result_queue.empty():
-            results.append(result_queue.get())
+            route_request= result_queue.get()
+            results.append(route_request)
+            # 数据库保存vin、匹配路线、匹配率、覆盖路线、日期
+            vin = route_request[0]
+            matched_route = route_request[1]
+            match_rate = route_request[2]
+            route_coverage = route_request[3]
+            print("存储展示：",vin,matched_route,match_rate,route_coverage,save_day)
+            db_manager.insert_match_result(vin, matched_route, match_rate, route_coverage, save_day)
 
         return results

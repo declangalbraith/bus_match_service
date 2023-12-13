@@ -1,3 +1,6 @@
 json5
 mysql-connector-python
 pandas
+requests
+flask
+Flask-APScheduler

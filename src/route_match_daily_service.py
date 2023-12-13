@@ -9,7 +9,7 @@ from math import radians, cos, sin, asin, sqrt
 from datetime import datetime
 
 #匹配率阈值，大于等于该阈值时，认为是找到匹配路线
-MATCH_RATE_THRESHOLD = 0.95
+MATCH_RATE_THRESHOLD = 0.85
 
 # 读取配置文件
 config = configparser.ConfigParser()
@@ -126,6 +126,7 @@ def calculate_route_match_rates(df, stations_dict, total_stations_per_route):
                         # 将站点添加到路线的已匹配站点集合中
                         matched_stations_per_route[route_name].add(station_name)
 
+    print(matched_stations_per_route)
     # 计算匹配率
     route_match_rates = {}
     for route_name, match_count in route_match_counts.items():
@@ -149,7 +150,7 @@ def get_authorization():
         "username": config['SDK']['USERNAME'],
         "password": config['SDK']['PASSWORD']
     }
-    response = requests.post(config['SDK']['LOGIN_URL'], data=params,verify=False)
+    response = requests.post(config['SDK']['LOGIN_URL'], data=params)
     if response.status_code != 200:
         raise Exception("获取Authorization失败")
     data = json.loads(response.text)["data"]
@@ -174,7 +175,7 @@ def get_get_response_body_json(param_map, url, authorization):
         "Authorization": authorization
     }
     try:
-        response = requests.get(real_url, headers=headers,verify=False)
+        response = requests.get(real_url, headers=headers)
         if response.status_code != 200:
             print(f"调用接口：{real_url} 失败")
             return None
@@ -225,12 +226,13 @@ if __name__ == '__main__':
     # df = pd.read_excel(excel_path, engine='openpyxl')
 
     author = get_authorization()
-    start_time = '2023-11-28 00:00:00'
-    end_time = '2023-11-28 23:59:59'
+    start_time = '2023-04-13 00:00:00'
+    end_time = '2023-04-13 23:59:59'
     start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
     end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-    df = getData("LJSKB6KT6MD001706", start_time, end_time)
-
+    df = getData("LJSKB6KN8KD005769", start_time, end_time)
+    pd.set_option('display.max_rows', None)
+    # print(df)
     for column in df.columns:
         df[column] = pd.to_numeric(df[column], errors='coerce')
     df = df.dropna()
@@ -240,8 +242,11 @@ if __name__ == '__main__':
         df['经度'] = df['经度'].round(2)
         df['纬度'] = df['纬度'].round(2)
         df = df.drop_duplicates(subset=['经度', '纬度'])
+        # print(df)
+
         #第4步、计算获取所有关联路线
         route_match_rates = calculate_route_match_rates(df, stations_dict, total_stations_per_route)
+        print(route_match_rates)
         #第5步、基于所有关联路线，优选出最佳路线
         best_route = find_best_route(route_match_rates, route_coverage)
 
