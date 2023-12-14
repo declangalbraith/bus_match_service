@@ -48,7 +48,7 @@ atexit.register(lambda: scheduler.shutdown())
 def get_match_results():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(current_dir, '..', '..', 'config.ini')
-    # Load configuration
+
     config = ConfigLoader(config_path).config
     db_config = {
         'host': config['database']['host'],
@@ -56,7 +56,6 @@ def get_match_results():
         'passwd': config['database']['passwd'],
         'database': config['database']['database']
     }
-    # print(db_config)
 
     db_manager = DatabaseManager(db_config)
 
