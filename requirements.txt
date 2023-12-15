@@ -4,3 +4,5 @@ pandas
 requests
 flask
 Flask-APScheduler
+openpyxl
+waitress
