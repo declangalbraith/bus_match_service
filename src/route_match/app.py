@@ -28,23 +28,24 @@ def scheduled_task():
 
         vehicle_ids = get_vehicle_ids(config['filepath']['excel_path'])
 
-        end_time = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(seconds=1)
-        start_time = end_time.replace(hour=0, minute=0, second=0)
+        # 设定结束时间为前一天的22:00
+        end_time = datetime.now().replace(hour=22, minute=0, second=0, microsecond=0) - timedelta(days=1)
+        # 设定开始时间为前一天的10:00
+        start_time = end_time.replace(hour=10, minute=0, second=0)
         print("Start scheduled task-------------------------------------------")
         task_manager.manage_tasks(vehicle_ids, start_time, end_time, db_manager)
-
         print("Scheduled task completed successfully.")
     except Exception as e:
         print(f"Error during scheduled task: {e}")
 
-# scheduled_task()
+# scheduled_task()#会阻塞运行
 
-scheduler.add_job(func=scheduled_task, trigger='cron', hour=2, minute=0)
+scheduler.add_job(func=scheduled_task, trigger='cron', hour=2, minute=00)
 scheduler.start()
 
 atexit.register(lambda: scheduler.shutdown())
 
-@app.route('/match-results', methods=['GET'])
+@app.route('/matchresults', methods=['GET'])
 def get_match_results():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(current_dir, '..', '..', 'config.ini')
@@ -70,7 +71,9 @@ def get_match_results():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-if __name__ == '__main__':
-    app.run(debug=True)
+#使用waitress-serve后无需使用以下代码
+# if __name__ == '__main__':
+#     # app.run(debug=True)
+#     app.run(host='0.0.0.0', port=5000,debug=False)
 
 

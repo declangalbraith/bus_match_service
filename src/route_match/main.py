@@ -33,17 +33,18 @@ def get_vehicle_ids(file_path):
     df = pd.read_excel(file_path, engine='openpyxl')
     return df['VIN']
 
-if __name__ == '__main__':
-    config, db_config = load_config()
-
-    data_fetcher = DataFetcher(config)
-    route_matcher = RouteMatcher(db_config)
-    task_manager = TaskManager(data_fetcher, route_matcher)
-
-    db_manager = DatabaseManager(db_config)
-
-    vehicle_ids = get_vehicle_ids(config['filepath']['excel_path'])
-    start_time = datetime.strptime('2023-12-12 00:00:00', "%Y-%m-%d %H:%M:%S")
-    end_time = datetime.strptime('2023-12-12 23:59:59', "%Y-%m-%d %H:%M:%S")
-
-    task_manager.manage_tasks(vehicle_ids, start_time, end_time,db_manager)
+#以下代码用来单独触发任务，项目正常运行时无需用到
+# if __name__ == '__main__':
+#     config, db_config = load_config()
+#
+#     data_fetcher = DataFetcher(config)
+#     route_matcher = RouteMatcher(db_config)
+#     task_manager = TaskManager(data_fetcher, route_matcher)
+#
+#     db_manager = DatabaseManager(db_config)
+#
+#     vehicle_ids = get_vehicle_ids(config['filepath']['excel_path'])
+#     start_time = datetime.strptime('2023-12-12 06:00:00', "%Y-%m-%d %H:%M:%S")
+#     end_time = datetime.strptime('2023-12-12 22:00:00', "%Y-%m-%d %H:%M:%S")
+#
+#     task_manager.manage_tasks(vehicle_ids, start_time, end_time,db_manager)

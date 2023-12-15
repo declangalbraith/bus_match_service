@@ -56,7 +56,7 @@ class TaskManager:
         threads = []
 
         # 创建工作线程
-        for _ in range(5):  # 线程数量
+        for _ in range(2):  # 线程数量
             thread = threading.Thread(target=self.worker, args=(task_queue, result_queue))
             thread.start()
             threads.append(thread)
