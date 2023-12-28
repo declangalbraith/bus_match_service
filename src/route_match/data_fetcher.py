@@ -1,6 +1,6 @@
 # 作 者： Liuyaoqiu
 # 日 期： 2023/12/4
-
+import time
 import requests
 import pandas as pd
 import json
@@ -85,3 +85,42 @@ class DataFetcher:
 
         print(f"数据获取成功：{vin}")
         return df
+
+    def fetch_and_save_vehicle_info(self):
+        token = self.get_authorization()
+        all_vehicles = []
+        current_page = 1
+        while True:
+            params = {
+                "provinceCode": "320000",
+                "cityCode": "321000",
+                'page': current_page,
+                'limit': 100
+            }
+
+            headers = {
+                'Authorization': token
+            }
+
+            response = requests.get(self.config['SDK']['INFO_URL'], headers=headers, params=params)
+
+            if response.status_code == 200:
+                data = response.json()['data']
+                all_vehicles.extend(data['list'])
+
+                if current_page < data['totalPage']:
+                    current_page += 1
+                else:
+                    break
+            else:
+                print(f'Error fetching page {current_page}: {response.status_code}')
+                break
+            time.sleep(1)
+
+        # Process and save the data
+        columns = ['vin', 'plateNumber', 'vehicleModelName', 'orderNO', 'buyCustomerName', 'provinceName', 'cityName']
+        df_vehicles = pd.DataFrame(all_vehicles)[columns]
+        df_vehicles.columns = ['VIN', '车牌', '车型', '订单号', '购车客户', '省份', '所属城市']
+        df_vehicles['所属区域'] = df_vehicles['省份'] + df_vehicles['所属城市']
+        df_vehicles.drop(['省份', '所属城市'], axis=1, inplace=True)
+        df_vehicles.to_excel(self.config['filepath']['excel_path'], index=False)

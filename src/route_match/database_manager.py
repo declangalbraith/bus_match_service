@@ -31,15 +31,36 @@ class DatabaseManager:
         except mysql.connector.Error as e:
             print(f"Error: {e}")
 
-    def get_match_results(self, date=None, vin=None):
-        results = []
+    def get_vins_by_order_or_model(self, query_value, query_type,vehicle_df):
+        #需要查询库关联表，通过订单/车型查询响应的vin列表
+        #先暂时用查询excel表代替
+        vehicle_df['订单号'] = vehicle_df['订单号'].astype(str)
+        if query_type == 'order':
+            vins = vehicle_df[vehicle_df['订单号'] == query_value]['VIN'].tolist()
+            print("查询的vin:",vins)
+        elif query_type == 'model':
+            vins = vehicle_df[vehicle_df['车型'] == query_value]['VIN'].tolist()
+            print("查询的vin:", vins)
+        else:
+            vins = []
+
+        return vins
+
+    def get_match_results(self, date=None, vins=None):
+        if vins is not None and len(vins) == 0:
+            return []
+
         query = "SELECT * FROM match_results"
         conditions = []
+        params = []
 
         if date:
-            conditions.append(f"date = '{date}'")
-        if vin:
-            conditions.append(f"vin = '{vin}'")
+            conditions.append("date = %s")
+            params.append(date)
+        if vins:
+            vin_placeholders = ', '.join(['%s'] * len(vins))
+            conditions.append("vin IN (" + vin_placeholders + ")")
+            params.extend(vins)
 
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
@@ -48,10 +69,11 @@ class DatabaseManager:
             connection = self.connect()
             if connection.is_connected():
                 cursor = connection.cursor(dictionary=True)
-                cursor.execute(query)
+                cursor.execute(query, tuple(params))
                 results = cursor.fetchall()
                 cursor.close()
                 connection.close()
+                return results
         except Error as e:
             print(f"Error reading data from MySQL table: {e}")
-        return results
+            return []

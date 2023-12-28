@@ -93,3 +93,4 @@ class TaskManager:
             db_manager.insert_match_result(vin, matched_route, match_rate, route_coverage, save_day)
 
         return results
+

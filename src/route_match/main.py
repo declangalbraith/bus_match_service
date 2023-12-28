@@ -33,6 +33,12 @@ def get_vehicle_ids(file_path):
     df = pd.read_excel(file_path, engine='openpyxl')
     return df['VIN']
 
+#待修改，暂时使用读取excel获取vin关联订单和车型
+def get_id_order_model(file_path):
+    df = pd.read_excel(file_path, engine='openpyxl', usecols=['VIN','车牌', '订单号', '车型', '购车客户', '所属区域'])
+    return df
+
+
 #以下代码用来单独触发任务，项目正常运行时无需用到
 # if __name__ == '__main__':
 #     config, db_config = load_config()

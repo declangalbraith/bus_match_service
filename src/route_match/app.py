@@ -10,9 +10,10 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 from datetime import datetime, timedelta
 from data_fetcher import DataFetcher
-from main import load_config, get_vehicle_ids
+from main import load_config, get_vehicle_ids,get_id_order_model
 from route_matcher import RouteMatcher
 from task_manager import TaskManager
+import pandas as pd
 
 app = Flask(__name__)
 scheduler = BackgroundScheduler()
@@ -20,8 +21,11 @@ scheduler = BackgroundScheduler()
 def scheduled_task():
     try:
         config, db_config = load_config()
-
         data_fetcher = DataFetcher(config)
+
+        #每次任务前先更新车辆信息
+        data_fetcher.fetch_and_save_vehicle_info()
+
         route_matcher = RouteMatcher(db_config)
         task_manager = TaskManager(data_fetcher, route_matcher)
         db_manager = DatabaseManager(db_config)
@@ -58,16 +62,47 @@ def get_match_results():
         'database': config['database']['database']
     }
 
-    db_manager = DatabaseManager(db_config)
-
+    query_type = request.args.get('query_type')
+    query_value = request.args.get('query_value')
     date = request.args.get('date')
-    vin = request.args.get('vin')
 
     try:
-        results = db_manager.get_match_results(date=date, vin=vin)
+        db_manager = DatabaseManager(db_config)
+        vehicle_df = get_id_order_model(config['filepath']['excel_path'])
 
-        return jsonify(results)
+        if query_type in ['order', 'model']:
+            vins = db_manager.get_vins_by_order_or_model(query_value, query_type,vehicle_df)
+            results = db_manager.get_match_results(date=date, vins=vins)
+            filtered_vehicle_df = vehicle_df[vehicle_df['VIN'].isin(vins)]
+        elif query_type == 'vin':
+            results = db_manager.get_match_results(date=date, vins=[query_value])
+            filtered_vehicle_df = vehicle_df[vehicle_df['VIN'].isin([query_value])]
+        else:
+            return jsonify({'error': 'Invalid query type'}), 400
 
+        if(results!=[]):
+            results_df = pd.DataFrame(results)
+            merged_df = pd.merge(
+                filtered_vehicle_df,
+                results_df,
+                left_on='VIN',
+                right_on='vin',
+                how='left'
+            )
+            final_df = merged_df[[
+                'date', 'VIN', '车牌', '订单号', '车型', '购车客户', '所属区域', 'matched_route', 'match_rate',
+                'route_coverage'
+            ]]
+            final_json_list = final_df.to_dict(orient='records')
+            return jsonify(final_json_list)
+        else:
+            filtered_vehicle_df = filtered_vehicle_df.copy()
+
+            filtered_vehicle_df['date'] = pd.NA
+            filtered_vehicle_df['match_rate'] = pd.NA
+            filtered_vehicle_df['matched_route'] = pd.NA
+            filtered_vehicle_df['route_coverage'] = pd.NA
+            return jsonify(filtered_vehicle_df.to_dict(orient='records'))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -75,5 +110,6 @@ def get_match_results():
 # if __name__ == '__main__':
 #     # app.run(debug=True)
 #     app.run(host='0.0.0.0', port=5000,debug=False)
+
 
 
