@@ -4,8 +4,6 @@
 
 from flask import Flask, request, jsonify
 from database_manager import DatabaseManager
-from config_loader import ConfigLoader
-import os
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 from datetime import datetime, timedelta
@@ -19,12 +17,16 @@ app = Flask(__name__)
 scheduler = BackgroundScheduler()
 
 def scheduled_task():
+    """
+    定时任务，每日凌晨2点开始匹配车辆清单中的公交路线信息,并将结果保存入库
+    :return:
+    """
     try:
         config, db_config = load_config()
         data_fetcher = DataFetcher(config)
 
         #每次任务前先更新车辆信息
-        data_fetcher.fetch_and_save_vehicle_info()
+        # data_fetcher.fetch_and_save_vehicle_info()
 
         route_matcher = RouteMatcher(db_config)
         task_manager = TaskManager(data_fetcher, route_matcher)
@@ -42,25 +44,18 @@ def scheduled_task():
     except Exception as e:
         print(f"Error during scheduled task: {e}")
 
-# scheduled_task()#会阻塞运行
-
-scheduler.add_job(func=scheduled_task, trigger='cron', hour=2, minute=00)
+scheduler.add_job(func=scheduled_task, trigger='cron', hour=15, minute=30)
 scheduler.start()
 
 atexit.register(lambda: scheduler.shutdown())
 
 @app.route('/matchresults', methods=['GET'])
 def get_match_results():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(current_dir, '..', '..', 'config.ini')
-
-    config = ConfigLoader(config_path).config
-    db_config = {
-        'host': config['database']['host'],
-        'user': config['database']['user'],
-        'passwd': config['database']['passwd'],
-        'database': config['database']['database']
-    }
+    """
+    请求查询，支持通过订单号、车型或者单车VIN进行检索
+    :return:
+    """
+    config, db_config = load_config()
 
     query_type = request.args.get('query_type')
     query_value = request.args.get('query_value')

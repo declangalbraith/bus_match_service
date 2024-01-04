@@ -6,6 +6,7 @@ import configparser
 class ConfigLoader:
     def __init__(self, config_path):
         self.config = self.load_config(config_path)
+        self.db_config = self.get_db_config()
 
     def load_config(self, config_path):
         config = configparser.ConfigParser()
@@ -13,3 +14,14 @@ class ConfigLoader:
             config.read_file(configfile)
         return config
 
+    def get_db_config(self):
+        """
+        提取数据库配置信息
+        """
+        db_config = {
+            'host': self.config['database']['host'],
+            'user': self.config['database']['user'],
+            'passwd': self.config['database']['passwd'],
+            'database': self.config['database']['database']
+        }
+        return db_config

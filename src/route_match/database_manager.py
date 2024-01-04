@@ -3,6 +3,7 @@
 
 import mysql.connector
 from mysql.connector import Error
+import json
 
 class DatabaseManager:
     def __init__(self, db_config):
@@ -77,3 +78,39 @@ class DatabaseManager:
         except Error as e:
             print(f"Error reading data from MySQL table: {e}")
             return []
+
+    def insert_match_line_GPS(self,top_route,vehicle_history):
+        vehicle_history = vehicle_history.rename(columns={'经度': 'longitude', '纬度': 'latitude'})
+        vehicle_history['longitude'] = vehicle_history['longitude'].round(3)
+        vehicle_history['latitude'] = vehicle_history['latitude'].round(3)
+        # 删除重复的行
+        vehicle_history = vehicle_history.drop_duplicates()
+        vehicle_history_json = vehicle_history.to_dict(orient='records')
+        vehicle_history_json_str = json.dumps(vehicle_history_json,ensure_ascii=False)
+
+        #将匹配的路线插入数据表
+        try:
+            connection = self.connect()
+            if connection.is_connected():
+                cursor = connection.cursor()
+
+                # 检查top_route是否已存在
+                query_check = "SELECT COUNT(*) FROM bus_line_gps WHERE route_name = %s"
+                cursor.execute(query_check, (top_route,))
+                if cursor.fetchone()[0] == 0:
+                    # 如果不存在，插入新记录
+                    query_insert = """
+                            INSERT INTO bus_line_gps (route_name, line_GPS)
+                            VALUES (%s, %s)
+                            """
+                    cursor.execute(query_insert, (top_route, vehicle_history_json_str))
+                    connection.commit()
+                    print(f"Inserted {top_route} into bus_line_gps")
+                else:
+                    print(f"Route {top_route} already exists in bus_line_gps")
+                cursor.close()
+        except Error as e:
+            print(f"Error interacting with MySQL: {e}")
+        finally:
+            if connection.is_connected():
+                connection.close()

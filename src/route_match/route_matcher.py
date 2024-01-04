@@ -4,10 +4,12 @@
 import mysql.connector
 import json
 from math import radians, cos, sin, asin, sqrt
+from database_manager import DatabaseManager
 
 class RouteMatcher:
     def __init__(self, db_config):
         self.stations_dict, self.total_stations_per_route, self.route_coverage = self.load_route_data(db_config)
+        self.db_manager = DatabaseManager(db_config)
 
     @staticmethod
     def haversine(lon1, lat1, lon2, lat2):
@@ -114,5 +116,9 @@ class RouteMatcher:
         top_matched_routes = [route for route, rate in route_match_rates.items() if rate == top_match_rate]
         # 从匹配率最高的路线中选择路径覆盖度最高的路线
         top_route = max(top_matched_routes, key=lambda route: self.route_coverage[route])
+
+        #将匹配率达到0.9的路线轨迹保存
+        if top_match_rate>=0.9:
+            self.db_manager.insert_match_line_GPS(top_route,vehicle_history)
 
         return top_route,route_match_rates,self.route_coverage

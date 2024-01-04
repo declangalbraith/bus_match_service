@@ -2,11 +2,6 @@
 # 日 期： 2023/12/4
 
 from config_loader import ConfigLoader
-from data_fetcher import DataFetcher
-from route_matcher import RouteMatcher
-from task_manager import TaskManager
-from datetime import datetime
-from database_manager import DatabaseManager
 import os
 import pandas as pd
 
@@ -19,13 +14,8 @@ def load_config():
 
     config_loader = ConfigLoader(config_path)
     config = config_loader.config
+    db_config = config_loader.db_config
 
-    db_config = {
-        'host': config['database']['host'],
-        'user': config['database']['user'],
-        'passwd': config['database']['passwd'],
-        'database': config['database']['database']
-    }
     return config, db_config
 
 def get_vehicle_ids(file_path):
