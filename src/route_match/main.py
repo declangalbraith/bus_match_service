@@ -4,6 +4,7 @@
 from config_loader import ConfigLoader
 import os
 import pandas as pd
+from slope_cacu import SlopeCacu
 
 def load_config():
     """加载配置文件并返回数据库配置和SDK配置"""
@@ -44,3 +45,9 @@ def get_id_order_model(file_path):
 #     end_time = datetime.strptime('2023-12-12 22:00:00', "%Y-%m-%d %H:%M:%S")
 #
 #     task_manager.manage_tasks(vehicle_ids, start_time, end_time,db_manager)
+
+#测试坡度计算
+# config, db_config = load_config()
+# slopecacu = SlopeCacu(config, db_config)
+# slope_result = slopecacu.process_route("627路(吴堡客运站--江都公交西站)")
+# print(slope_result)

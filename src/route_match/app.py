@@ -11,6 +11,7 @@ from data_fetcher import DataFetcher
 from main import load_config, get_vehicle_ids,get_id_order_model
 from route_matcher import RouteMatcher
 from task_manager import TaskManager
+from slope_cacu import SlopeCacu
 import pandas as pd
 
 app = Flask(__name__)
@@ -44,11 +45,12 @@ def scheduled_task():
     except Exception as e:
         print(f"Error during scheduled task: {e}")
 
-scheduler.add_job(func=scheduled_task, trigger='cron', hour=15, minute=30)
+scheduler.add_job(func=scheduled_task, trigger='cron', hour=2, minute=0)
 scheduler.start()
 
 atexit.register(lambda: scheduler.shutdown())
 
+#请求路线匹配的路由
 @app.route('/matchresults', methods=['GET'])
 def get_match_results():
     """
@@ -98,6 +100,23 @@ def get_match_results():
             filtered_vehicle_df['matched_route'] = pd.NA
             filtered_vehicle_df['route_coverage'] = pd.NA
             return jsonify(filtered_vehicle_df.to_dict(orient='records'))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+#请求坡度计算的路由
+@app.route('/calculateslope', methods=['GET'])
+def calculate_slope():
+    config, db_config = load_config()
+
+    route_name = request.args.get('route_name')
+    if not route_name:
+        return jsonify({'error': 'Route name is required'}), 400
+
+    try:
+        slopecacu = SlopeCacu(config, db_config)
+        slope_result = slopecacu.process_route(route_name)
+
+        return jsonify(slope_result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

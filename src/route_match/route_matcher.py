@@ -118,7 +118,8 @@ class RouteMatcher:
         top_route = max(top_matched_routes, key=lambda route: self.route_coverage[route])
 
         #将匹配率达到0.9的路线轨迹保存
-        if top_match_rate>=0.9:
-            self.db_manager.insert_match_line_GPS(top_route,vehicle_history)
+        #经验证，实际轨迹存在跳变，取消使用
+        # if top_match_rate>=0.9:
+        #     self.db_manager.insert_match_line_GPS(top_route,vehicle_history)
 
         return top_route,route_match_rates,self.route_coverage

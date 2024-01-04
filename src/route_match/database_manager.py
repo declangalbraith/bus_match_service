@@ -114,3 +114,29 @@ class DatabaseManager:
         finally:
             if connection.is_connected():
                 connection.close()
+
+    def get_line_GPS(self, tableName = None,lineName=None):
+        """根据线路名称查询GPS信息"""
+        query = "SELECT * FROM "+tableName
+        conditions = []
+        params = []
+
+        if lineName is not None:
+            conditions.append("route_name = %s")
+            params.append(lineName)
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        try:
+            connection = self.connect()
+            if connection.is_connected():
+                cursor = connection.cursor(dictionary=True)
+                cursor.execute(query, tuple(params))
+                results = cursor.fetchall()
+                cursor.close()
+                connection.close()
+                return results
+        except Error as e:
+            print(f"Error reading data from MySQL table: {e}")
+            return []
