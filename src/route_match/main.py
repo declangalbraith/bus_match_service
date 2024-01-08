@@ -4,7 +4,6 @@
 from config_loader import ConfigLoader
 import os
 import pandas as pd
-from slope_cacu import SlopeCacu
 
 def load_config():
     """加载配置文件并返回数据库配置和SDK配置"""

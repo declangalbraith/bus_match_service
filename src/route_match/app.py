@@ -16,6 +16,8 @@ import pandas as pd
 
 app = Flask(__name__)
 scheduler = BackgroundScheduler()
+#配置初始化
+config, db_config = load_config()
 
 def scheduled_task():
     """
@@ -23,7 +25,7 @@ def scheduled_task():
     :return:
     """
     try:
-        config, db_config = load_config()
+        # config, db_config = load_config()
         data_fetcher = DataFetcher(config)
 
         #每次任务前先更新车辆信息
@@ -57,7 +59,7 @@ def get_match_results():
     请求查询，支持通过订单号、车型或者单车VIN进行检索
     :return:
     """
-    config, db_config = load_config()
+    # config, db_config = load_config()
 
     query_type = request.args.get('query_type')
     query_value = request.args.get('query_value')
@@ -106,9 +108,19 @@ def get_match_results():
 #请求坡度计算的路由
 @app.route('/calculateslope', methods=['GET'])
 def calculate_slope():
-    config, db_config = load_config()
+    # config, db_config = load_config()
+    CITY_DATABASE = ["江苏省扬州市"]
 
+    city_name = request.args.get('city')
     route_name = request.args.get('route_name')
+
+    if not city_name:
+        return jsonify({'error': 'city_name is required'}), 400
+
+    # 检查 city_name 是否在 CITY_DATABASE 中
+    if city_name not in CITY_DATABASE:
+        return jsonify({'error': '该城市未录入高程库'}), 400
+
     if not route_name:
         return jsonify({'error': 'Route name is required'}), 400
 
@@ -117,8 +129,11 @@ def calculate_slope():
         slope_result = slopecacu.process_route(route_name)
 
         return jsonify(slope_result)
+
     except Exception as e:
+        app.logger.error(f"Error calculating slope: {e}")
         return jsonify({'error': str(e)}), 500
+
 
 #使用waitress-serve后无需使用以下代码
 # if __name__ == '__main__':
