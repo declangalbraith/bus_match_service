@@ -6,8 +6,13 @@ from mysql.connector import Error
 import json
 
 class DatabaseManager:
-    def __init__(self, db_config):
+    def __init__(self, db_config, city):
         self.db_config = db_config
+        self.city = city
+        self.table_prefix = f"bus_routes_{city.lower()}"
+
+    def get_table_name(self, table_type):
+        return f"{self.table_prefix}_{table_type}"
 
     def connect(self):
         try:
@@ -17,14 +22,15 @@ class DatabaseManager:
             print(f"Error connecting to MySQL database: {e}")
             return None
 
-    def insert_match_result(self, vin, matched_route, match_rate, route_coverage, date):
+    def insert_match_result(self, vin, matched_route, match_rate, route_coverage, date, city):
+        table_name = "match_results" if city.lower() == "yangzhou" else f"match_results_{city.lower()}"
         try:
             connection = self.connect()
             cursor = connection.cursor()
-            insert_query = """
-            INSERT INTO match_results (vin, matched_route, match_rate, route_coverage, date)
-            VALUES (%s, %s, %s, %s, %s)
-            """
+            insert_query = f"""
+                    INSERT INTO {table_name} (vin, matched_route, match_rate, route_coverage, date)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """
             cursor.execute(insert_query, (vin, matched_route, match_rate, route_coverage, date))
             connection.commit()
             cursor.close()
@@ -47,17 +53,27 @@ class DatabaseManager:
 
         return vins
 
-    def get_match_results(self, date=None, vins=None):
+    def get_match_results(self, start_date=None, end_date=None, vins=None, city='default'):
         if vins is not None and len(vins) == 0:
             return []
 
-        query = "SELECT * FROM match_results"
+        table_name = f"match_results_{city.lower()}"
+        query = f"SELECT * FROM {table_name}"
         conditions = []
         params = []
 
-        if date:
-            conditions.append("date = %s")
-            params.append(date)
+        # 检查并添加日期范围条件
+        if start_date and end_date:
+            conditions.append("date BETWEEN %s AND %s")
+            params.extend([start_date, end_date])
+        elif start_date:  # 只有起始日期
+            conditions.append("date >= %s")
+            params.append(start_date)
+        elif end_date:  # 只有结束日期
+            conditions.append("date <= %s")
+            params.append(end_date)
+
+        # 检查并添加VIN条件
         if vins:
             vin_placeholders = ', '.join(['%s'] * len(vins))
             conditions.append("vin IN (" + vin_placeholders + ")")
@@ -117,7 +133,7 @@ class DatabaseManager:
 
     def get_line_GPS(self, tableName = None,lineName=None):
         """根据线路名称查询GPS信息"""
-        query = "SELECT * FROM "+tableName
+        query = "SELECT * FROM "+self.table_prefix
         conditions = []
         params = []
 

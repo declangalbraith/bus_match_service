@@ -6,3 +6,5 @@ flask
 Flask-APScheduler
 openpyxl
 waitress
+scipy
+pyarrow

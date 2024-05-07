@@ -7,6 +7,7 @@ import datetime
 from scipy.spatial import cKDTree
 from database_manager import DatabaseManager
 import json
+import requests
 
 class PositionUtil:
     EARTH_RADIUS = 6378.137  # 地球半径（单位：千米）
@@ -50,26 +51,94 @@ def get_b(x, y, j):
     return b
 
 class SlopeCacu:
-    def __init__(self, config, db_config):
+    def __init__(self, config, db_config,col_data):
         self.config = config
         self.db_config = db_config
+        self.col_data = col_data
 
-    def get_route_data(self, line_name):
-        db_client = DatabaseManager(self.db_config)
+    def extract_polyline_from_route(self, route_data, target_bus_route_name):
+        """
+        Extracts polyline data for a specified bus route from the route data.
+
+        :param route_data: Route data from API response.
+        :param target_bus_route_name: The name of the target bus route.
+        :return: A list of polyline data for the specified bus route.
+        """
+        polyline_data = []
+
+        lngArr = []
+        latArr = []
+        transits = route_data["route"]["transits"]
+        if transits:
+            for transit in route_data["route"]["transits"]:
+                for segment in transit["segments"]:
+                    if segment["bus"]["buslines"]:
+                        for busline in segment["bus"]["buslines"]:
+                            # if busline["name"] == target_bus_route_name:
+                            polyline_data.append(busline["polyline"])
+        else:
+            return lngArr, latArr
+
+        combined_polyline = ';'.join(polyline_data)
+        coordinates = combined_polyline.split(';')
+
+        for coord in coordinates:
+            lng, lat = coord.split(',')
+            lngArr.append(float(lng))
+            latArr.append(float(lat))
+        return lngArr, latArr
+
+    def get_and_extract_polyline(self, api_key, origin, destination, city, target_bus_route_name):
+        """
+        Fetches bus route data and extracts polyline data for a specified bus route.
+
+        :param api_key: API key for the service.
+        :param origin: Origin coordinates (latitude, longitude).
+        :param destination: Destination coordinates (latitude, longitude).
+        :param city: City name or code.
+        :param target_bus_route_name: The name of the target bus route.
+        :return: A list of polyline data for the specified bus route, or an error message.
+        """
+        url = 'https://restapi.amap.com/v3/direction/transit/integrated'
+        params = {
+            'key': api_key,
+            'origin': origin,
+            'destination': destination,
+            'city': city,
+            'extensions': 'all',
+            'strategy': '0'
+        }
+
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            route_data = response.json()
+
+            if route_data.get('status') == '1' and route_data.get('route'):
+                return self.extract_polyline_from_route(route_data, target_bus_route_name)
+            else:
+                return "API returned an error or no route information."
+
+        return f"Request failed, status code: {response.status_code}"
+
+    def get_route_data(self, city_name,line_name):
+        db_client = DatabaseManager(self.db_config,city_name)
         line_GPS_data = db_client.get_line_GPS("bus_routes", lineName=line_name)
-        gps_col = 'via_stations'
-
-        lngArr, latArr = self.parse_gps_data(line_GPS_data, gps_col)
+        line_GPS_data = line_GPS_data[0]
+        origin = str(line_GPS_data["start_station_longitude"])+','+str(line_GPS_data["start_station_latitude"])
+        destination = str(line_GPS_data["end_station_longitude"])+','+str(line_GPS_data["end_station_latitude"])
+        lngArr, latArr = self.get_and_extract_polyline(self.config['key']['API_KEY'], origin, destination, city_name, line_name)
+        if not lngArr or not latArr:
+            gps_col = 'via_stations'
+            lngArr, latArr = self.parse_gps_data(line_GPS_data, gps_col)
         return lngArr, latArr
 
     def parse_gps_data(self, gps_data, gps_col):
         lngArr, latArr = [], []
-        for entry in gps_data:
-            via_stations = json.loads(entry[gps_col])
-            for station in via_stations:
-                if station['longitude'] != 0 and station['latitude'] != 0:
-                    lngArr.append(station['longitude'])
-                    latArr.append(station['latitude'])
+        via_stations = json.loads(gps_data[gps_col])
+        for station in via_stations:
+            if station['longitude'] != 0 and station['latitude'] != 0:
+                lngArr.append(station['longitude'])
+                latArr.append(station['latitude'])
         return lngArr, latArr
 
     def get_map(self,lngArr,latArr):
@@ -77,10 +146,10 @@ class SlopeCacu:
         min_lng, max_lng = min(lngArr), max(lngArr)
         min_lat, max_lat = min(latArr), max(latArr)
 
-        col_data = pd.read_parquet(self.config['filepath']['parquet_path'], columns=['经度', '纬度', '高程'])
+        # col_data = pd.read_parquet(self.config['filepath']['parquet_path'], columns=['经度', '纬度', '高程'])
         # 筛选落在矩形区域内的点
-        filtered_data = col_data[(col_data['经度'] >= min_lng) & (col_data['经度'] <= max_lng) &
-                                 (col_data['纬度'] >= min_lat) & (col_data['纬度'] <= max_lat)]
+        filtered_data = self.col_data[(self.col_data['经度'] >= min_lng) & (self.col_data['经度'] <= max_lng) &
+                                 (self.col_data['纬度'] >= min_lat) & (self.col_data['纬度'] <= max_lat)]
 
         lngArr1 = filtered_data['经度'].tolist()  # 列表C
         latArr1 = filtered_data['纬度'].tolist()  # 列表D
@@ -195,8 +264,8 @@ class SlopeCacu:
 
         return slope_result
 
-    def process_route(self, line_name):
-        lngArr, latArr = self.get_route_data(line_name)
+    def process_route(self, city_name,line_name):
+        lngArr, latArr = self.get_route_data(city_name,line_name)
         lngArr1,latArr1,altitudeArr1=self.get_map(lngArr, latArr)
         lngArrPlot, latArrPlot,newAltitudeArr = self.interpolate_and_match(lngArr, latArr,lngArr1,latArr1,altitudeArr1)
         slope_result = self.calculate_slope(lngArrPlot, latArrPlot, newAltitudeArr)

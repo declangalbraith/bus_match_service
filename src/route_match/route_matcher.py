@@ -5,11 +5,13 @@ import mysql.connector
 import json
 from math import radians, cos, sin, asin, sqrt
 from database_manager import DatabaseManager
+import eviltransform
 
 class RouteMatcher:
-    def __init__(self, db_config):
-        self.stations_dict, self.total_stations_per_route, self.route_coverage = self.load_route_data(db_config)
-        self.db_manager = DatabaseManager(db_config)
+    def __init__(self, db_config, city):
+        self.city = city
+        self.stations_dict, self.total_stations_per_route, self.route_coverage = self.load_route_data(db_config, city)
+        self.db_manager = DatabaseManager(db_config, city)
 
     @staticmethod
     def haversine(lon1, lat1, lon2, lat2):
@@ -27,6 +29,12 @@ class RouteMatcher:
         r = 6371  # 地球平均半径，单位为公里
         return c * r
 
+    # 转换位置坐标
+    def wgs84_to_gcj02(self,lat, lon):
+        # 使用eviltransform库转换坐标
+        gcj_lat, gcj_lon = eviltransform.wgs2gcj(lat, lon)
+        return gcj_lon, gcj_lat
+
     def calculate_route_coverage(self,via_stations_list):
         """
         获取每条线路的路径长度
@@ -40,10 +48,11 @@ class RouteMatcher:
             total_distance += distance
         return total_distance
 
-    def load_route_data(self, db_config):
+    def load_route_data(self, db_config, city):
+        table_name = "bus_routes" if city.lower() == "yangzhou" else f"bus_routes_{city.lower()}"
         with mysql.connector.connect(**db_config) as cnx:
             with cnx.cursor() as cursor:
-                query = "SELECT route_name, via_stations FROM bus_routes"
+                query = f"SELECT route_name, via_stations FROM {table_name}"
                 cursor.execute(query)
                 results = cursor.fetchall()
 
@@ -75,7 +84,7 @@ class RouteMatcher:
 
             # 计算并存储每条路线的总站点数
             total_stations_per_route[route_name] = len(via_stations_list)
-
+        # print(stations_dict)
         return stations_dict, total_stations_per_route, route_coverage
 
     def match_route(self, vehicle_history):
@@ -90,15 +99,19 @@ class RouteMatcher:
         route_match_counts = {}
         matched_stations_per_route = {route_name: set() for route_name in self.total_stations_per_route}
 
-        # 遍历轨迹中的每个位置点
+        # 遍历转换坐标后的每个位置点
         for index, row in vehicle_history.iterrows():
+            # 对当前行的经纬度进行坐标转换
+            gcj_lon, gcj_lat = self.wgs84_to_gcj02(row['纬度'], row['经度'])
+
             for station_name, data in self.stations_dict.items():
                 station_position = data['position']
-                if abs(row['经度'] - station_position[0]) < 0.01 and abs(row['纬度'] - station_position[1]) < 0.01:
+                # 使用转换后的坐标来比较距离
+                if abs(gcj_lon - station_position[0]) < 0.005 and abs(gcj_lat - station_position[1]) < 0.005:
                     # 遍历每个站点关联的所有路线
                     for route_name in data['routes']:
                         if station_name not in matched_stations_per_route[route_name]:
-                            # 如果站点在路线的已匹配站点集合中不存在，增加匹配次数
+                            # 如果站点不在路线的已匹配站点集合中，增加匹配次数
                             route_match_counts[route_name] = route_match_counts.get(route_name, 0) + 1
                             # 将站点添加到路线的已匹配站点集合中
                             matched_stations_per_route[route_name].add(station_name)
@@ -108,18 +121,18 @@ class RouteMatcher:
         for route_name, match_count in route_match_counts.items():
             total_stations = self.total_stations_per_route[route_name]
             route_match_rates[route_name] = match_count / total_stations
+            # print(route_name,match_count / total_stations,self.route_coverage[route_name])
 
         if not route_match_rates:
             return None,None,None
-        # 找出匹配率最高的路线
-        top_match_rate = max(route_match_rates.values())
-        top_matched_routes = [route for route, rate in route_match_rates.items() if rate == top_match_rate]
-        # 从匹配率最高的路线中选择路径覆盖度最高的路线
-        top_route = max(top_matched_routes, key=lambda route: self.route_coverage[route])
 
-        #将匹配率达到0.9的路线轨迹保存
-        #经验证，实际轨迹存在跳变，取消使用
-        # if top_match_rate>=0.9:
-        #     self.db_manager.insert_match_line_GPS(top_route,vehicle_history)
+        # 筛选出匹配率在0.95以上的所有路线
+        matched_routes = [route for route, rate in route_match_rates.items() if rate >= 0.95]
+        if not matched_routes:  # 如果没有匹配率在0.95以上的路线，则保留原有逻辑
+            top_match_rate = max(route_match_rates.values())
+            matched_routes = [route for route, rate in route_match_rates.items() if rate == top_match_rate]
+
+        # 从这些路线中选择路径覆盖度最高的路线
+        top_route = max(matched_routes, key=lambda route: self.route_coverage[route])
 
         return top_route,route_match_rates,self.route_coverage

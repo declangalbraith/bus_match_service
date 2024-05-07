@@ -4,5 +4,11 @@
     },
     "重庆市长寿区": {
         "parquet_path": "D:/~工作/2024/202401/changshou.parquet"
+    },
+    "重庆市涪陵区": {
+        "parquet_path": "D:/~工作/2024/202401/fuling.parquet"
+    },
+    "重庆市垫江区": {
+        "parquet_path": "D:/~工作/2024/202401/dianjiang.parquet"
     }
 }

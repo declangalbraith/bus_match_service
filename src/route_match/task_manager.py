@@ -47,7 +47,7 @@ class TaskManager:
                 print(f"在处理 {vin} 时发生错误: {e}")
                 task_queue.task_done()
 
-    def manage_tasks(self, vehicle_ids, start_time, end_time,db_manager):
+    def manage_tasks(self, vehicle_ids, start_time, end_time,db_manager,city):
         """
         管理和分配任务到线程。
         """
@@ -90,7 +90,7 @@ class TaskManager:
             match_rate = route_request[2]
             route_coverage = route_request[3]
             print("存储展示：",vin,matched_route,match_rate,route_coverage,save_day)
-            db_manager.insert_match_result(vin, matched_route, match_rate, route_coverage, save_day)
+            db_manager.insert_match_result(vin, matched_route, match_rate, route_coverage, save_day,city)
 
         return results
 

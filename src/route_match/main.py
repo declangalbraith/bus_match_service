@@ -4,6 +4,12 @@
 from config_loader import ConfigLoader
 import os
 import pandas as pd
+from datetime import datetime, timedelta
+from data_fetcher import DataFetcher
+from route_matcher import RouteMatcher
+from task_manager import TaskManager
+from database_manager import DatabaseManager
+from collections import defaultdict
 
 def load_config():
     """加载配置文件并返回数据库配置和SDK配置"""
@@ -23,9 +29,16 @@ def get_vehicle_ids(file_path):
     df = pd.read_excel(file_path, engine='openpyxl')
     return df['VIN']
 
+
+def get_vehicle_ids_by_city(excel_path):
+    df = pd.read_excel(excel_path)
+    vehicle_ids_city = pd.Series(df.city.values, index=df.VIN).to_dict()
+
+    return vehicle_ids_city
+
 #待修改，暂时使用读取excel获取vin关联订单和车型
 def get_id_order_model(file_path):
-    df = pd.read_excel(file_path, engine='openpyxl', usecols=['VIN','车牌', '订单号', '车型', '购车客户', '所属区域'])
+    df = pd.read_excel(file_path, engine='openpyxl', usecols=['VIN','车牌', '订单号', '车型', '购车客户', '所属区域', 'city'])
     return df
 
 
@@ -34,19 +47,25 @@ def get_id_order_model(file_path):
 #     config, db_config = load_config()
 #
 #     data_fetcher = DataFetcher(config)
-#     route_matcher = RouteMatcher(db_config)
-#     task_manager = TaskManager(data_fetcher, route_matcher)
+#     vehicle_ids_city = get_vehicle_ids_by_city(config['filepath']['excel_path'])
 #
-#     db_manager = DatabaseManager(db_config)
+#     # vehicle_ids_city = {
+#     #     # 'LJSKB8PP0KD005707': 'yangzhou',
+#     #     # 'LJSKB8PP2KD005661': 'yangzhou',
+#     #     'LJSKB8KX4ND001865': 'chongqing',
+#     #     'LJSKB8KXXPD000609': 'chongqing',
+#     # }
 #
-#     vehicle_ids = get_vehicle_ids(config['filepath']['excel_path'])
-#     start_time = datetime.strptime('2023-12-12 06:00:00', "%Y-%m-%d %H:%M:%S")
-#     end_time = datetime.strptime('2023-12-12 22:00:00', "%Y-%m-%d %H:%M:%S")
+#     start_time = datetime.strptime('2024-04-05 06:00:00', "%Y-%m-%d %H:%M:%S")
+#     end_time = datetime.strptime('2024-04-05 22:00:00', "%Y-%m-%d %H:%M:%S")
 #
-#     task_manager.manage_tasks(vehicle_ids, start_time, end_time,db_manager)
+#     city_vehicle_ids = defaultdict(list)
+#     for vehicle_id, city in vehicle_ids_city.items():
+#         city_vehicle_ids[city].append(vehicle_id)
+#
+#     for city, vehicle_ids in city_vehicle_ids.items():
+#         db_manager = DatabaseManager(db_config, city)
+#         route_matcher = RouteMatcher(db_config, city)
+#         task_manager = TaskManager(data_fetcher, route_matcher)
+#         task_manager.manage_tasks(vehicle_ids, start_time, end_time, db_manager, city)
 
-#测试坡度计算
-# config, db_config = load_config()
-# slopecacu = SlopeCacu(config, db_config)
-# slope_result = slopecacu.process_route("627路(吴堡客运站--江都公交西站)")
-# print(slope_result)
