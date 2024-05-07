@@ -1,0 +1,8 @@
+{
+    "江苏省扬州市": {
+        "parquet_path": "D:/~工作/2024/202401/yangzhou.parquet"
+    },
+    "重庆市长寿区": {
+        "parquet_path": "D:/~工作/2024/202401/changshou.parquet"
+    }
+}
